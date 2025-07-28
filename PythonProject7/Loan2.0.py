@@ -155,7 +155,7 @@ def generate_current_loan_portfolio(num_loans=50000): # Increased default curren
 
 @st.cache_data(show_spinner="Fetching real macroeconomic data...")
 def fetch_macro_data(start_date=datetime(2000, 1, 1), end_date=datetime.now()):
-    """Fetches real macroeconomic data from FRED."""
+    """Fetches real macroeconomic data from FRED using pandas_datareader."""
     try:
         macro_data = pdr.DataReader(['UNRATE', 'GDP'], 'fred', start_date, end_date)
         # Forward-fill GDP to align with monthly UNRATE for display purposes
@@ -220,26 +220,35 @@ st.write("This application simulates a large bank's auto loan portfolio and fore
 # --- About This App / Key Concepts ---
 with st.expander("About This App & Key Concepts"):
     st.markdown("""
-    This interactive tool demonstrates a comprehensive auto loan loss forecasting framework. It simulates a portfolio of auto loans, integrates real economic data, and uses machine learning models to predict potential credit losses under different economic conditions.
+**Sophisticated Synthetic Portfolio Generation:**
+* **Historical Data for Training:** The app begins by generating a synthetic historical dataset of auto loans. This data is crafted to simulate past loan performance, including loan defaults (`Defaulted` status) and the proportion of loss incurred upon default (`LGD - Loss Given Default`). It features realistic loan attributes such as `Customer FICO` scores (with a bank-like distribution that includes a significant portion of subprime loans), `Original Balance`, `Loan Age`, `LTV at Origination`, `DTI Ratio`, and `Vehicle Type`. Crucially, this historical data also incorporates simulated macroeconomic variables like `Historical Unemployment Rate` and `Historical Used Car Price Change` to train models that are sensitive to economic shifts.
+* **Current Loan Portfolio for Forecasting:** Concurrently, the application generates a larger, active auto loan portfolio that mirrors the characteristics of a typical bank's book. This portfolio includes the current `Remaining Balance` for each loan and detailed origination information (`Origination Date`, `Origination Year`, `Origination Quarter`), which are essential for forward-looking risk assessment.
 
-    **What is Loss Forecasting?**
-    Loss forecasting is a critical process for banks and lenders to estimate potential future credit losses on their loan portfolios. This helps them set aside adequate reserves, manage risk, and comply with regulations. The core formula for Expected Loss (EL) is:
-    $EL = PD \\times LGD \\times EAD$
+**External Macroeconomic Data Integration:**
+* The application integrates real-world macroeconomic data directly from the Federal Reserve Economic Data (FRED) using the `pandas_datareader` library. It specifically fetches `Unemployment Rate (UNRATE)` and `Gross Domestic Product (GDP)` series. This data is critical for anchoring the "Base Case" economic scenario and for establishing realistic parameters for stressed scenarios, ensuring the forecasts are grounded in plausible economic conditions. If fetching live data encounters issues, the app gracefully falls back to using pre-defined simulated values.
 
-    **Key Terms:**
-    * **PD (Probability of Default):** The likelihood that a borrower will fail to make loan payments. Our model uses a Logistic Regression model to predict this.
-    * **LGD (Loss Given Default):** The percentage of the loan's outstanding balance that is lost if a default occurs (i.e., after any collateral recovery). Our model uses a Linear Regression model to predict this.
-    * **EAD (Exposure at Default):** The outstanding principal balance of the loan when a default occurs.
-    * **FICO Segment:** A common credit scoring system indicating a borrower's creditworthiness. Lower FICO scores generally imply higher risk.
-    * **Vintage Analysis:** Grouping loans by their origination period (e.g., year) to observe how different cohorts perform over time.
-    * **Macroeconomic Scenarios:** Different economic conditions (e.g., 'Base Case', 'Mild Recession') used to stress-test the portfolio's performance.
+**Machine Learning Models for Credit Risk Quantification:**
+* **Probability of Default (PD) Model:** A Logistic Regression model is trained on the synthetic historical data to predict the `Probability of Default` for each loan. This model uses key borrower and loan characteristics (`Customer FICO`, `Loan Age`, `DTI Ratio`, `LTV at Origination`) along with macroeconomic factors (`Historical Unemployment Rate`) to estimate the likelihood of a borrower defaulting.
+* **Loss Given Default (LGD) Model:** A Linear Regression model is simultaneously trained to predict the `Loss Given Default`. This model quantifies the percentage of the outstanding balance that would be lost if a default occurs, considering factors like `LTV at Origination`, `Vehicle Type`, and `Historical Used Car Price Change` (reflecting collateral value depreciation).
+* Both models utilize `scikit-learn` pipelines with `StandardScaler` for numerical feature normalization and `OneHotEncoder` for handling categorical variables, ensuring robust model training. The performance of these models (AUC for PD, RMSE for LGD) is displayed to provide insights into their predictive power on the simulated data.
 
-    **How to Use:**
-    1.  Adjust the number of historical and current loans in the sidebar.
-    2.  Explore the "Data Used in the Model" section to see the generated data and loan-level predictions.
-    3.  Review the "Portfolio Summary & Scenario Analysis" to understand aggregate expected losses under different economic conditions, including a 'Custom Scenario' you can define.
-    4.  Analyze the "Advanced Portfolio Analysis" charts to understand risk segmentation by FICO, vintage, and vehicle type.
-    5.  Use the "Download All Model Data to Excel" button to get the raw and processed data for further analysis.
+**Dynamic Multi-Scenario Expected Loss Forecasting:**
+* The core analytical capability involves projecting loan-level and aggregate Expected Losses (EL) across various economic scenarios. The fundamental formula `EL = PD × LGD × EAD` (where EAD is the `Remaining Balance`) is applied.
+* **Pre-defined Scenarios:** The app includes a "Base Case" scenario (reflecting current economic conditions), a "Mild Recession," and a "Severe Recession." The parameters for these scenarios (Unemployment Rate, GDP Growth, Used Car Price Change) are dynamically influenced by the fetched FRED data, providing a realistic stress-testing framework.
+* **Custom Scenario Definition:** Users have the flexibility to define their own hypothetical economic scenarios by adjusting sliders for Unemployment Rate, GDP Growth, and Used Car Price Change, allowing for tailored "what-if" analyses.
+* The application calculates and prominently displays the total Expected Loss and Portfolio Loss Rate for the entire (or filtered) portfolio under each of these scenarios. It also quantifies the dollar and percentage impact of stressed scenarios relative to the Base Case.
+
+**Interactive Portfolio Segmentation and Visualization:**
+* **Dynamic Filtering:** Users can interactively filter the "Current Loan Portfolio" data by `FICO Segment` (Excellent, Good, Fair, Subprime-Mid, Subprime-Low) and `Vehicle Type`. This allows forecasters to focus their analysis on specific high-risk or interesting sub-segments of the portfolio.
+* **Granular Analysis Charts:** The app generates several informative plots using `matplotlib` and `seaborn`, with numerical totals displayed directly on the bars for clarity:
+    * **Total Expected Loss Across Macroeconomic Scenarios:** A bar chart comparing aggregate losses across all defined scenarios, highlighting the impact of economic downturns.
+    * **Expected Loss Distribution by FICO Segment:** A bar chart showing how expected losses are concentrated across different credit quality buckets under the base case.
+    * **Expected Loss by Origination Vintage:** A line plot illustrating how expected losses vary based on the year loans were originated, crucial for identifying underperforming cohorts.
+    * **Expected Loss by Vehicle Type:** A bar chart breaking down expected losses by different vehicle categories, indicating asset-specific risk.
+* **Model Interpretability:** It provides a detailed view of the coefficients for both the PD and LGD models, offering transparency into how each input feature contributes to the model's predictions (e.g., higher DTI might mean higher PD).
+
+**Comprehensive Data Export:**
+* A dedicated "Download All Model Data to Excel" button allows users to export all generated and processed data, including historical loan data, the current loan portfolio with all calculated PDs, LGDs, and Expected Losses for each scenario, and the macroeconomic data, into a single, organized Excel workbook. This facilitates further offline analysis and reporting.
     """)
 
 # --- User Inputs ---
@@ -415,7 +424,8 @@ el_by_vintage.columns = ['Origination Year', 'Expected Loss (Base Case)']
 el_by_vehicle_type = current_loan_data.groupby('Vehicle Type')['Expected Loss (EL) (Base Case)'].sum().reset_index()
 el_by_vehicle_type.columns = ['Vehicle Type', 'Expected Loss (Base Case)']
 
-# Removed EL by State from export as per user request
+# The state filter was removed from the app's display/logic in the previous step,
+# so this section for export is removed as well to match that.
 # el_by_state = current_loan_data.groupby('State')['Expected Loss (EL) (Base Case)'].sum().reset_index()
 # el_by_state.columns = ['State', 'Expected Loss (Base Case)']
 
@@ -459,8 +469,7 @@ st.subheader("Filterable Current Loan Portfolio Data")
 st.write("Apply filters to explore specific segments of the portfolio and see how summary metrics and charts update.")
 
 # Interactive Filters
-# Adjust columns for filters as 'State' is removed
-filter_col1, filter_col2 = st.columns(2) # Changed from 3 columns to 2
+filter_col1, filter_col2 = st.columns(2) # Remains 2 columns as state filter was removed earlier
 with filter_col1:
     selected_fico_buckets = st.multiselect(
         "Filter by FICO Segment:",
@@ -473,19 +482,12 @@ with filter_col2:
         options=current_loan_data['Vehicle Type'].unique().tolist(),
         default=current_loan_data['Vehicle Type'].unique().tolist()
     )
-# Removed State filter as per user request
-# with filter_col3:
-#     selected_states = st.multiselect(
-#         "Filter by State:",
-#         options=current_loan_data['State'].unique().tolist(),
-#         default=current_loan_data['State'].unique().tolist()
-#     )
+# The state filter section was previously removed to match user request.
 
-# Apply filters - Removed state filter from logic
+# Apply filters
 filtered_loan_data = current_loan_data[
     current_loan_data['PD Bucket'].isin(selected_fico_buckets) &
     current_loan_data['Vehicle Type'].isin(selected_vehicle_types)
-    # & current_loan_data['State'].isin(selected_states) # Removed state filter
 ]
 
 st.write(f"Displaying {len(filtered_loan_data)} out of {len(current_loan_data)} loans in filtered view.")
@@ -664,11 +666,6 @@ ax3.set_title('Expected Loss by Origination Vintage (Base Case - Filtered)', fon
 ax3.set_xlabel('Origination Year', fontsize=12)
 ax3.set_ylabel('Expected Loss ($)', fontsize=12)
 ax3.ticklabel_format(style='plain', axis='y')
-# Add values above data points for line plot (requires a bit more manual work for precise placement,
-# but can be done with ax.text. For simplicity, we'll skip direct label on line plot,
-# but if the user insists, we can add it later using ax.text for each point.)
-# Example for bar_label not directly applicable to line plots without custom iteration.
-# If values are desired on line plot points, let me know, and I can add more complex code.
 plt.tight_layout()
 st.pyplot(fig3)
 buf3 = io.BytesIO()
@@ -709,8 +706,6 @@ This Streamlit application demonstrates a highly sophisticated framework for an 
 5.  **Granular Portfolio Segmentation & Vintage Analysis:** Breaks down Expected Losses by FICO segment, Origination Vintage, and Vehicle Type with corresponding visualizations.
 6.  **Automated & Advanced Visualization:** Generates professional-grade plots to illustrate key findings dynamically.
 """)
-
-
 
 
 
